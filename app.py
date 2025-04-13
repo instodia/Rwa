@@ -1,28 +1,27 @@
 from flask import Flask, request, jsonify
-import time, hmac, hashlib, base64
+from flask_cors import CORS
+import base64
+import time
+import hmac
+import hashlib
 
 app = Flask(__name__)
+CORS(app)  # <--- Add this line
 
-# Change this to your actual secret key (keep it private!)
-SECRET_KEY = b'your-very-secret-key'
-
-@app.route('/')
-def home():
-    return 'Token Generator is Running.'
+SECRET_KEY = b'3f74459e-14f6-4d50-8de7-50d7a1677cbf'
 
 @app.route('/generate-token', methods=['POST'])
 def generate_token():
     data = request.json
     url_prefix = data.get('url_prefix')
-
     if not url_prefix:
-        return jsonify({"error": "Missing url_prefix"}), 400
+        return jsonify({'error': 'url_prefix is required'}), 400
 
-    expires = int(time.time()) + 3600  # valid for 1 hour
-    token_data = f"URLPrefix={url_prefix}~Expires={expires}"
+    expires = int(time.time()) + 86400
+    url_prefix_encoded = base64.urlsafe_b64encode(url_prefix.encode()).decode().rstrip('=')
+    string_to_sign = f'URLPrefix={url_prefix_encoded}~Expires={expires}'
+    signature = hmac.new(SECRET_KEY, string_to_sign.encode(), hashlib.sha256).digest()
+    signature_encoded = base64.urlsafe_b64encode(signature).decode().rstrip('=')
 
-    signature = hmac.new(SECRET_KEY, token_data.encode(), hashlib.sha256).digest()
-    encoded_signature = base64.urlsafe_b64encode(signature).decode().rstrip('=')
-
-    token = f"{token_data}~Signature={encoded_signature}"
-    return jsonify({"token": token})
+    token = f'URLPrefix={url_prefix_encoded}~Expires={expires}~Signature={signature_encoded}'
+    return jsonify({'token': token})
